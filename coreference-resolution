@@ -1,0 +1,141 @@
+import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.CollapsedCCProcessedDependenciesAnnotation;
+import edu.stanford.nlp.dcoref.CorefChain.CorefMention;
+import edu.stanford.nlp.dcoref.CorefCoreAnnotations.CorefChainAnnotation;
+import edu.stanford.nlp.dcoref.CorefCoreAnnotations.CorefGraphAnnotation;
+import edu.stanford.nlp.ling.CoreAnnotations.NamedEntityTagAnnotation;
+import edu.stanford.nlp.ling.CoreAnnotations.PartOfSpeechAnnotation;
+import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
+import edu.stanford.nlp.ling.CoreAnnotations.TextAnnotation;
+import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
+import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
+import edu.stanford.nlp.ling.CoreLabel;
+import edu.stanford.nlp.dcoref.CorefChain;
+import edu.stanford.nlp.pipeline.*;
+import edu.stanford.nlp.trees.Tree;
+import edu.stanford.nlp.semgraph.SemanticGraph;
+import edu.stanford.nlp.util.CoreMap;
+import edu.stanford.nlp.util.IntTuple;
+import edu.stanford.nlp.util.Pair;
+import edu.stanford.nlp.util.Timing;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties; 
+import java.io.InputStreamReader;  
+import java.io.BufferedReader;  
+import java.io.BufferedWriter;   
+import java.io.FileWriter;  
+import java.io.Serializable;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Set;
+
+public class Coreference {
+	/**
+	 * @param args the command line arguments
+	 */
+	public static void main(String[] args) throws IOException, ClassNotFoundException {
+		// creates a StanfordCoreNLP object, with POS tagging, lemmatization, NER, parsing, and coreference resolution 
+		Properties props = new Properties();
+		props.put("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
+		StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
+		
+		List<String> pron = new ArrayList();
+		pron.add("it");pron.add("its");pron.add("itself");
+		pron.add("he");pron.add("him");pron.add("his");pron.add("himself");
+		pron.add("she");pron.add("her");pron.add("herself");pron.add("hers");
+		pron.add("they");pron.add("them");pron.add("their");pron.add("themselves");
+		pron.add("theirs");pron.add("you");pron.add("your");pron.add("yours");
+		pron.add("yourself");pron.add("yourselves");pron.add("I");pron.add("me");
+		pron.add("myself");	pron.add("mine");pron.add("my");
+
+		// read some text in the text variable
+		String pathname = "C:\\******";
+		List<String> listString = new ArrayList<String>();
+		listString.add(pathname + "1.background2");
+		listString.add(pathname + "2.Early_life2");
+		listString.add(pathname + "3.Education2");
+		listString.add(pathname + "4.Manhattan_project2");
+		listString.add(pathname + "5.Early_academic_career2");
+		listString.add(pathname + "6.Caltech_years2");
+		listString.add(pathname + "7.Challenger_disaster2");
+		
+		List<String> listString_2 = new ArrayList<String>();
+		listString_2.add(pathname + "0test");
+		
+		for(int i = 0; i < listString_2.size(); i++){
+			String name = listString_2.get(i);
+			File filename = new File(name +".txt");
+			InputStreamReader reader = new InputStreamReader(
+					new FileInputStream(filename));
+			BufferedReader br = new BufferedReader(reader);
+			String read = "";  
+			String text = "";
+			read = br.readLine(); 
+			while (read != null) {
+				text = text + read + "\r\n";
+				read = br.readLine();  
+			} 	
+			//Create a file for the output
+			File writename = new File(name +"_output.txt");
+			writename.createNewFile(); 
+			BufferedWriter outer = new BufferedWriter(new FileWriter(writename));
+		
+			// create an empty Annotation just with the given text
+			Annotation document = new Annotation(text);
+
+			// run all Annotators on this text
+			pipeline.annotate(document);
+			
+			// these are all the sentences in this document
+			// a CoreMap is essentially a Map that uses class objects as keys and has values with custom types
+			List<CoreMap> sentences = document.get(SentencesAnnotation.class);
+
+			Map<Integer, CorefChain> coref = document.get(CorefChainAnnotation.class);
+			
+			List<List<CoreLabel>> tkss = new ArrayList();
+			for(int m = 0; m < sentences.size(); m = m + 1){
+				tkss.add(sentences.get(m).get(TokensAnnotation.class));
+			}
+			
+			for(Map.Entry<Integer, CorefChain> entry : coref.entrySet()) {
+				CorefChain c = entry.getValue();
+
+				//this is because it prints out a lot of self references which aren't that useful
+				if(c.getMentionsInTextualOrder().size() <= 1)
+					continue;         
+
+				CorefMention cm = c.getRepresentativeMention();
+            
+				String clust = "";
+				List<CoreLabel> tks = tkss.get(cm.sentNum-1);
+				
+				for(int k = cm.startIndex-1; k < cm.endIndex - 1; k++)
+					clust += tks.get(k).get(TextAnnotation.class) + " ";
+				clust = clust.trim();
+				
+				for(CorefMention m : c.getMentionsInTextualOrder()){
+					if(pron.contains(tkss.get(m.sentNum-1).get(m.startIndex-1).get(TextAnnotation.class).toLowerCase())){
+						tkss.get(m.sentNum-1).get(m.startIndex-1).setWord(clust);
+						for(int l = m.startIndex; l < m.endIndex-1; l++){
+							tkss.get(m.sentNum-1).get(l).setWord("");
+						}					
+					}				
+				}			
+			}
+		for(int x = 0; x < sentences.size(); x++){
+			List<CoreLabel> tksbar = tkss.get(x);
+			for(int y = 0; y < tksbar.size();y++){
+				outer.write(tksbar.get(y).get(TextAnnotation.class)+" ");
+			}
+			outer.write("\r\n");
+		}						
+        outer.flush();
+        outer.close();
+		}
+	}
+}
