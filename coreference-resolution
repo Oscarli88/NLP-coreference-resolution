@@ -64,11 +64,9 @@ public class Coreference {
 		listString.add(pathname + "6.Caltech_years2");
 		listString.add(pathname + "7.Challenger_disaster2");
 		
-		List<String> listString_2 = new ArrayList<String>();
-		listString_2.add(pathname + "0test");
 		
-		for(int i = 0; i < listString_2.size(); i++){
-			String name = listString_2.get(i);
+		for(int i = 0; i < listString.size(); i++){
+			String name = listString.get(i);
 			File filename = new File(name +".txt");
 			InputStreamReader reader = new InputStreamReader(
 					new FileInputStream(filename));
@@ -80,6 +78,7 @@ public class Coreference {
 				text = text + read + "\r\n";
 				read = br.readLine();  
 			} 	
+			
 			//Create a file for the output
 			File writename = new File(name +"_output.txt");
 			writename.createNewFile(); 
